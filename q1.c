@@ -56,7 +56,7 @@ int main(int argc, char *argv[]) {
 	
 	/* create cartesian mapping */
 	wrap_around[0] = 0;
-	wrap_around[1] = 0; /* periodic shift is .false. */
+	wrap_around[1] = 0; /* periodic shift is .false. Flat 2d graph*/
 	reorder = 1;
 	ierr =0;
 	ierr = MPI_Cart_create(MPI_COMM_WORLD, ndims, dims, wrap_around, reorder, &comm2D);
@@ -70,7 +70,7 @@ int main(int argc, char *argv[]) {
 	/* axis=0 ==> shift along the rows: P[my_row-1]: P[me] : P[my_row+1] */
 	/* axis=1 ==> shift along the columns P[my_col-1]: P[me] : P[my_col+1] */
 	
-	MPI_Cart_shift( comm2D, SHIFT_ROW, DISP, &nbr_i_lo, &nbr_i_hi );
+	MPI_Cart_shift( comm2D,  , DISP, &nbr_i_lo, &nbr_i_hi );
 	MPI_Cart_shift( comm2D, SHIFT_COL, DISP, &nbr_j_lo, &nbr_j_hi );
 	
 	//printf("Global rank: %d. Cart rank: %d. Coord: (%d, %d). Left: %d. Right: %d. Top: %d. Bottom: %d\n", my_rank, my_cart_rank, coord[0], coord[1], nbr_j_lo, nbr_j_hi, nbr_i_lo, nbr_i_hi);
@@ -88,9 +88,9 @@ int main(int argc, char *argv[]) {
 	
 	
 	MPI_Request send_request[4];
-        MPI_Request receive_request[4];
-        MPI_Status send_status[4];
-        MPI_Status receive_status[4];
+	MPI_Request receive_request[4];
+	MPI_Status send_status[4];
+	MPI_Status receive_status[4];
 	
 	sleep(my_rank);
 	unsigned int seed = time(NULL);

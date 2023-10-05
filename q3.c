@@ -23,7 +23,7 @@ int main(int argc, char **argv)
 }
 
 /* This is the master */
-int master_io(MPI_Comm master_comm, MPI_Comm comm)
+int master_io(MPI_Comm master_comm, MPI_Comm comm) 
 {
     int i,j, size;
     char buf[256];
