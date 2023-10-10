@@ -70,7 +70,7 @@ int main(int argc, char *argv[]) {
 	/* axis=0 ==> shift along the rows: P[my_row-1]: P[me] : P[my_row+1] */
 	/* axis=1 ==> shift along the columns P[my_col-1]: P[me] : P[my_col+1] */
 	
-	MPI_Cart_shift( comm2D,  , DISP, &nbr_i_lo, &nbr_i_hi );
+	MPI_Cart_shift( comm2D,  SHIFT_ROW, DISP, &nbr_i_lo, &nbr_i_hi );
 	MPI_Cart_shift( comm2D, SHIFT_COL, DISP, &nbr_j_lo, &nbr_j_hi );
 	
 	//printf("Global rank: %d. Cart rank: %d. Coord: (%d, %d). Left: %d. Right: %d. Top: %d. Bottom: %d\n", my_rank, my_cart_rank, coord[0], coord[1], nbr_j_lo, nbr_j_hi, nbr_i_lo, nbr_i_hi);

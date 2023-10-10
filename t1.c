@@ -20,6 +20,7 @@ int main(int argc, char **argv)
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     
+	//size - 1 master 
     MPI_Comm_split( MPI_COMM_WORLD,rank == size-1, 0, &new_comm); // color will either be 0 or 1 
     if (rank == size-1) 
 	master_io( MPI_COMM_WORLD, new_comm );
@@ -70,16 +71,16 @@ int slave_io(MPI_Comm world_comm, MPI_Comm comm)
 	int wrap_around[ndims];
 	char buf[256];
     
-    	MPI_Comm_size(world_comm, &worldSize); // size of the world communicator
+    MPI_Comm_size(world_comm, &worldSize); // size of the world communicator
   	MPI_Comm_size(comm, &size); // size of the slave communicator
 	MPI_Comm_rank(comm, &my_rank);  // rank of the slave communicator
 	dims[0]=dims[1]=0;
 	
 	MPI_Dims_create(size, ndims, dims);
-    	if(my_rank==0)
-		printf("Slave Rank: %d. Comm Size: %d: Grid Dimension = [%d x %d] \n",my_rank,size,dims[0],dims[1]);
+	if(my_rank==0)
+	printf("Slave Rank: %d. Comm Size: %d: Grid Dimension = [%d x %d] \n",my_rank,size,dims[0],dims[1]);
 
-    	/* create cartesian mapping */
+	/* create cartesian mapping */
 	wrap_around[0] = 0;
 	wrap_around[1] = 0; /* periodic shift is .false. */
 	reorder = 0;
@@ -92,10 +93,10 @@ int slave_io(MPI_Comm world_comm, MPI_Comm comm)
 	/* use my cartesian coordinates to find my rank in cartesian group*/
 	MPI_Cart_rank(comm2D, coord, &my_cart_rank);
 
-/*
+
 	printf("Global rank (within slave comm): %d. Cart rank: %d. Coord: (%d, %d).\n", my_rank, my_cart_rank, coord[0], coord[1]);
 	fflush(stdout);
-*/
+
 
 	sprintf( buf, "Hello from slave %d at Coordinate: (%d, %d)\n", my_rank, coord[0], coord[1]);
 	MPI_Send( buf, strlen(buf) + 1, MPI_CHAR, worldSize-1, MSG_PRINT_ORDERED, world_comm );

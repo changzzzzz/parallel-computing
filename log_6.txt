@@ -1,0 +1,2 @@
+Global rank: 6. Cart rank: 6. Coord: (6, 0, 0). Rear: -2. Front: -2. Top: 5. Bottom: -2. Left: -2. Right: -2. 
+
