@@ -16,12 +16,14 @@
 #define SHIFT_ROW 0
 #define SHIFT_COL 1
 #define DISP 1
-#define randomUB 10
+#define K 10
 
 int master_io(MPI_Comm world_comm, MPI_Comm comm);
 int slave_io(MPI_Comm world_comm, MPI_Comm comm);
 void* ProcessFunc(void *pArg);
 void* SimulatePortNumber(void *pArg);
+void* ResponseToNeighbour(void *pArg);
+
 
 
 pthread_mutex_t g_Mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -150,6 +152,8 @@ struct ThreadArgs {
 	int rank;
 };
 
+
+
 /* This is the node */
 int slave_io(MPI_Comm world_comm, MPI_Comm comm)
 { 
@@ -163,6 +167,7 @@ int slave_io(MPI_Comm world_comm, MPI_Comm comm)
 	MPI_Request receive_request[4];
 	MPI_Status send_status[4];
 	MPI_Status receive_status[4];
+
 	
 
     MPI_Comm_size(world_comm, &worldSize); // size of the world communicator
@@ -190,6 +195,10 @@ int slave_io(MPI_Comm world_comm, MPI_Comm comm)
 	// Check free port received from neighbour 
 	MPI_Cart_shift( comm2D, SHIFT_ROW, DISP, &nbr_i_lo, &nbr_i_hi );
 	MPI_Cart_shift( comm2D, SHIFT_COL, DISP, &nbr_j_lo, &nbr_j_hi );
+	
+	//q2 send and receive value of each node
+	int action_list[4] = {nbr_j_lo, nbr_j_hi, nbr_i_lo, nbr_i_hi};
+	int recv_data[4] = {-1, -1, -1, -1};
 	// neighbour's rank
 
 	// Receive stop signal from base
@@ -201,7 +210,7 @@ int slave_io(MPI_Comm world_comm, MPI_Comm comm)
 	
 	// Keep working until stop signal
 	while (!termination_received) {
-
+		
 		// Simulate the port number in pthread, store the value in num
 		pthread_t tid;
 		struct ThreadArgs args;
@@ -209,67 +218,68 @@ int slave_io(MPI_Comm world_comm, MPI_Comm comm)
 		args.rank = my_rank;
 		pthread_create(&tid, NULL, SimulatePortNumber, (void *)&args);
 		pthread_join(tid, NULL); 
-		// printf("rank:%d, random Number: %d \n",my_rank, num);
-		// fflush(stdout);
 
+		// int received_data;
+		// MPI_Request receive_from_neighbour_status;
+		// MPI_Status neighbour_status;
+		// while(1){
+		// 	MPI_Irecv(&received_data, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &receive_from_neighbour_status);
+		// 	int received_flag = 0;
+        // 	MPI_Test(&receive_from_neighbour_status, &received_flag, &neighbour_status);
+		// 	if(received_flag){
 
-		// Check current node is full or not
-		if(num == randomUB-1){
-			printf("No free port, need to check neighbour's value.%d rank:%d\n",num,my_rank);
-		
-			
-			/*
-			MPI_Isend(&num, 1, MPI_INT, action_list[i], 0, comm2D, &send_request[i]);
-			MPI_Irecv(&recv_data[i], 1, MPI_INT, action_list[i], 0, comm2D, &receive_request[i]);
-			*/
-			int action_list[4] = {nbr_j_lo, nbr_j_hi, nbr_i_lo, nbr_i_hi};
-			int recv_data[4] = {-1, -1, -1, -1};
-
-
-			//q2 send and receive value of each node
-			for (int i = 0; i < 4; i++){
-				MPI_Isend(&num, 1, MPI_INT, action_list[i], 0, comm2D, &send_request[i]);
-				MPI_Irecv(&recv_data[i], 1, MPI_INT, action_list[i], 0, comm2D, &receive_request[i]);
-			}
-			MPI_Waitall(4, send_request, send_status);
-			MPI_Waitall(4, receive_request, receive_status);
-
-			//print result
-			// if(my_rank == 1){
-				// Neighbour's rank : nbr_j_lo
-				// printf("Cart rank: %d. Coord: (%d, %d). Rank{ Left: %d. Right: %d. Top: %d. Bottom: %d}\n",  my_cart_rank, coord[0], coord[1], nbr_j_lo, nbr_j_hi, nbr_i_lo, nbr_i_hi);
-				// Self value + Neighbour's value : 
-			printf("Rank: %d; Random value: %d; Value{ Recv Left: %d; Recv Right: %d; Recv Top: %d; Recv Bottom: %d;}\n", my_cart_rank, num, recv_data[0], recv_data[1], recv_data[2], recv_data[3]);
-				// Neighbour's value : recv_data[0-3]
-				// printf("Cart rank: %d. Coord: (%d, %d). Value{ Recv Left: %d; Recv Right: %d; Recv Top: %d; Recv Bottom: %d;} \n",  my_cart_rank, coord[0], coord[1],recv_data[0], recv_data[1], recv_data[2], recv_data[3]);
-		}else{
-
-		}
+		// 	}
+		// 	MPI_Wait(&receive_from_neighbour_status, &neighbour_status);
+		// 	int sender_rank = status.MPI_SOURCE;
 			
 		// }
+
+		for (int i = 0; i < 4; i++){
+			MPI_Isend(&num, 1, MPI_INT, action_list[i], MSG_ASK, comm2D, &send_request[i]);
+			MPI_Irecv(&recv_data[i], 1, MPI_INT, action_list[i], MSG_ASK, comm2D, &receive_request[i]);
+		}
+		MPI_Waitall(4, send_request, send_status);
+		MPI_Waitall(4, receive_request, receive_status);
+
+		//print result
+		// if(my_rank == 1){
+			// Neighbour's rank : nbr_j_lo
+			// printf("Cart rank: %d. Coord: (%d, %d). Rank{ Left: %d. Right: %d. Top: %d. Bottom: %d}\n",  my_cart_rank, coord[0], coord[1], nbr_j_lo, nbr_j_hi, nbr_i_lo, nbr_i_hi);
+			// Self value + Neighbour's value : 
+		printf("Rank: %d; Coord: (%d, %d). Random value: %d; Value{ Recv Left: %d; Recv Right: %d; Recv Top: %d; Recv Bottom: %d;}Rank{ Left: %d. Right: %d. Top: %d. Bottom: %d}\n", my_cart_rank,coord[0], coord[1], num, recv_data[0], recv_data[1], recv_data[2], recv_data[3],nbr_j_lo, nbr_j_hi, nbr_i_lo, nbr_i_hi);
+			// Neighbour's value : recv_data[0-3]
+			// printf("Cart rank: %d. Coord: (%d, %d). Value{ Recv Left: %d; Recv Right: %d; Recv Top: %d; Recv Bottom: %d;} \n",  my_cart_rank, coord[0], coord[1],recv_data[0], recv_data[1], recv_data[2], recv_data[3]);
+		
+		// This node is full
+
+		if(num == K-1){
+			int flag = 1;
+			int freeNeighbour[4] = {0, 0, 0, 0};
+
+			// if any neighbour has free port, flag = 0, and it will be recorded in freeNeighbour
+			for (int i = 0; i < size; ++i) {
+        		if (recv_data[i] > 0 || recv_data[i] < K) {
+					flag = 0;
+					freeNeighbour[i] = 1;
+       			}
+			}
+			if(flag){
+				
+			}
+		}
+
+
+
+
+
+
+
+
 		sleep(2);
 		// Check stop signal
 		MPI_Test(&termination_request, &termination_received, &termination_status);
 	}
-
-
-
 	
-	// printf("Cart rank: %d. Coord: (%d, %d). Rank{ Left: %d. Right: %d. Top: %d. Bottom: %d}\n",  my_cart_rank, coord[0], coord[1], nbr_j_lo, nbr_j_hi, nbr_i_lo, nbr_i_hi);
-	// printf("Random value: %d; Value{ Recv Left: %d; Recv Right: %d; Recv Top: %d; Recv Bottom: %d;}\n", num, recv_data[0], recv_data[1], recv_data[2], recv_data[3]);
-	// printf("Cart rank: %d. Coord: (%d, %d). Value{ Recv Left: %d; Recv Right: %d; Recv Top: %d; Recv Bottom: %d;} \n",  my_cart_rank, coord[0], coord[1],recv_data[0], recv_data[1], recv_data[2], recv_data[3]);
-
-    //t1
-	// printf("Global rank (within slave comm): %d. Cart rank: %d. Coord: (%d, %d).\n", my_rank, my_cart_rank, coord[0], coord[1]);
-	// fflush(stdout);
-
-
-    ///////////
-	// sprintf( buf, "Hello from slave %d at Coordinate: (%d, %d)\n", my_rank, coord[0], coord[1]);
-	// MPI_Send( buf, strlen(buf) + 1, MPI_CHAR, worldSize-1, MSG_PRINT_ORDERED, world_comm );
-
-	// sprintf( buf, "Goodbye from slave %d at Coordinate: (%d, %d)\n", my_rank, coord[0], coord[1]);
-	// MPI_Send(buf, strlen(buf) + 1, MPI_CHAR, worldSize-1, MSG_PRINT_ORDERED, world_comm);
 
 	// // exit
     // sprintf(buf, "Exit notification from %d\n", my_rank);
@@ -288,13 +298,15 @@ void* SimulatePortNumber(void *args) // Common function prototype
 
 	srand(time(NULL));
 	unsigned int seed = time(NULL) * rank;
-	int num = rand_r(&seed) % randomUB;
-	// printf("rank:%d, randomUB:%d, randomNumber:%d \n",rank, randomUB, num);
-	fflush(stdout);
+	int num = rand_r(&seed) % K;
+	// printf("rank:%d, K:%d, randomNumber:%d \n",rank, K, num);
+	// fflush(stdout);
 
     *(threadArgs->result) = num; 
     pthread_exit(NULL);
 }
+
+
 
 //mpicc a2.c -o a2 -lm
 //mpirun -np 7 -oversubscribe t1 3 2
@@ -303,3 +315,12 @@ void* SimulatePortNumber(void *args) // Common function prototype
 
 
 
+		//print result
+		// if(my_rank == 1){
+			// Neighbour's rank : nbr_j_lo
+			// printf("Cart rank: %d. Coord: (%d, %d). Rank{ Left: %d. Right: %d. Top: %d. Bottom: %d}\n",  my_cart_rank, coord[0], coord[1], nbr_j_lo, nbr_j_hi, nbr_i_lo, nbr_i_hi);
+			// Self value + Neighbour's value : 
+		// printf("Rank: %d; Random value: %d; Value{ Recv Left: %d; Recv Right: %d; Recv Top: %d; Recv Bottom: %d;}\n", my_cart_rank, num, recv_data[0], recv_data[1], recv_data[2], recv_data[3]);
+			// Neighbour's value : recv_data[0-3]
+			// printf("Cart rank: %d. Coord: (%d, %d). Value{ Recv Left: %d; Recv Right: %d; Recv Top: %d; Recv Bottom: %d;} \n",  my_cart_rank, coord[0], coord[1],recv_data[0], recv_data[1], recv_data[2], recv_data[3]);
+		

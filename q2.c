@@ -109,7 +109,7 @@ int main(int argc, char *argv[]) {
 		matching_count = 0; //reset the matching count
 			
 		while(true){
-			num = rand_r(&seed) % randomUB;
+			num = rand_r(&seed) % K;
 			if(IsPrime(num) == 0){
 				break;
 			}

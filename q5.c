@@ -99,7 +99,7 @@ int main(int argc, char **argv)
 	while(iteration_count < MAX_ITERATION){
 		
 		while(true){
-			randVal = rand_r(&randomSeed) % randomUB;
+			randVal = rand_r(&randomSeed) % K;
 			if(IsPrime(randVal) == 0){
 				break;
 			}
