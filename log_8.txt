@@ -1,0 +1,11 @@
+Max port number 10
+Report number 8
+Alert reported time : 2023-10-16 21:42:04
+ 
+Logged time: 2023-10-16 21:42:04 
+Reporting node     Coordinate     Prot Value     Availability to be considered full
+2                  (0,2)          9              1 
+Adjacent node     Coordinate     Prot Value     Availability to be considered full
+1                 (0,1)          8              2 
+5                 (1,2)          8              2 
+End of file 

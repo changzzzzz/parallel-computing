@@ -8,7 +8,7 @@
 #include <pthread.h>
 
 #define MSG_EXIT 1
-#define MSG_PRINT_ORDERED 2
+#define MSG_INITIALIZE 2
 #define MSG_PRINT_UNORDERED 3
 #define MSG_END 4
 #define MSG_REPORT 5
@@ -58,8 +58,6 @@ int main(int argc, char **argv)
         if( rank == 0) printf("nrows %d, ncols %d, cores: %d\n", nrows, ncols ,size);
 
     }
-
-
     // Create base and node
     MPI_Comm new_comm;
     MPI_Comm_split( MPI_COMM_WORLD, rank == size - 1 , 0, &new_comm);
@@ -68,140 +66,67 @@ int main(int argc, char **argv)
     else
 	slave_io( MPI_COMM_WORLD, new_comm);
     MPI_Finalize();
-
-
     return 0;
-}
-
-void* ProcessFunc(void *pArg) // Common function prototype
-{
-	int i = 0, size, nslaves, firstmsg;
-	char buf[256], buf2[256];
-	FILE *pFile;
-	MPI_Status status;
-	MPI_Comm_size(MPI_COMM_WORLD, &size );
-	
-	int* p = (int*)pArg;
-	nslaves = *p;
-	int reportNumber = 1;
-
-	while (nslaves > 0 && reportNumber<10) {
-		MPI_Recv(buf, 256, MPI_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status );
-		switch (status.MPI_TAG) {
-			case MSG_EXIT: nslaves--; break;
-			case MSG_PRINT_UNORDERED:
-				printf("Thread prints: %s", buf);
-				fflush(stdout);
-			break;
-			case MSG_PRINT_ORDERED:
-				firstmsg = status.MPI_SOURCE;
-				for (i=0; i<size-1; i++) {
-					if (i == firstmsg){
-						printf("Thread prints: %s", buf);
-						fflush(stdout);
-					}else {
-						MPI_Recv( buf2, 256, MPI_CHAR, i, MSG_PRINT_ORDERED, MPI_COMM_WORLD, &status );
-						printf("Thread prints: %s", buf2);
-						fflush(stdout);
-					}
-				}
-			break;
-			case MSG_REPORT:
-				printf("Thread prints: %s", buf);
-				fflush(stdout);
-
-				int result[13];
-				char delimiter = ',';
-				char* token = strtok(buf, &delimiter);
-				for(i=0;i<13;i++){
-				
-				// printf("%s\n", token);
-				result[i]=atoi(token);
-				token = strtok(NULL, &delimiter);
-    			}
-				// printf("%s",token);
-				time_t currentTime;
-				time(&currentTime);
-				char timeString[100]; 
-				struct tm *localTime = localtime(&currentTime);
-				strftime(timeString, sizeof(timeString), "%Y-%m-%d %H:%M:%S", localTime);
-
-				int sender_rank = status.MPI_SOURCE;
-				sprintf(buf, "log_%d.txt", reportNumber);
-				pFile = fopen(buf, "w");
-				fprintf(pFile, "Max port number %d\n",K);
-				fprintf(pFile, "Report number %d\n",reportNumber);
-				fprintf(pFile, "Alert reported time : %s \n",token);
-				fprintf(pFile, "Logged time: %s \n",timeString);		 
-				fprintf(pFile, "Reporting node     Coordinate     Prot Value     Availability to be considered full\n");
-				fprintf(pFile, "%d                  (%d,%d)          %d              %d \n",result[0],result[1],result[2],result[3],K - result[3]);
-				fprintf(pFile, "Adjacent node     Coordinate     Prot Value     Availability to be considered full\n");
-				for(i=8;i<12;i++){
-					if(result[i]>=0){
-						fprintf(pFile, "%d                 (%d,%d)          %d              %d \n",result[i],result[i]/result[12],result[i]%result[12],result[i-4],K - result[i-4]);
-					}
-				}
-				fprintf(pFile, "End of file \n");
-				// printf("Rank: 0%d; Coord: (1%d, 2%d). Node's Load: 3%d; Value{ Recv Left: 4%d; Recv Right: 5%d; Recv Top: 6%d; Recv Bottom: 7%d;}Rank{ Left: 8%d. Right: 9%d. Top:10 %d. Bottom: 11%d}\n", my_cart_rank,coord[0], coord[1], num, recv_data[0], recv_data[1], recv_data[2], recv_data[3],nbr_j_lo, nbr_j_hi, nbr_i_lo, nbr_i_hi);
-				fclose(pFile);
-				reportNumber++;
-				break;
-		}
-	}
-	return 0;
 }
 
 
 /* This is the base */
 int master_io(MPI_Comm world_comm, MPI_Comm comm) 
 {
-	int size, nslaves;
-	MPI_Comm_size(world_comm, &size );
+	int size, nslaves,i,zero=0;
+	MPI_Comm_size(world_comm, &size);
 	nslaves = size - 1;
-	
+	pthread_mutex_t g_Mutex = PTHREAD_MUTEX_INITIALIZER;
+
+	/**/
+	//topology store the neighbour of each node
+	int topology[nslaves][4];
+	MPI_Request init_request;
+	for(i=0;i<nslaves;i++){
+		printf("Ask slave for their neighbour: %d\n",i);
+		fflush(stdout);
+		MPI_Isend(&i, 1, MPI_INT, i, MSG_INITIALIZE, world_comm,&init_request);
+	}
+	printf("Initialze topology finished\n");
+	fflush(stdout);
+	/**/
+
 	// pthread_t tid;
 	// pthread_create(&tid, 0, ProcessFunc, &nslaves); // Create the thread
 	// pthread_join(tid, NULL);
-	int i = 0, firstmsg;
+	int  firstmsg;
+	i = 0;
 	char buf[256], buf2[256];
 	FILE *pFile;
 	MPI_Status status;
 	// MPI_Comm_size(MPI_COMM_WORLD, &size );
-	
-	// int* p = (int*)pArg;
-	// nslaves = *p;
-	int reportNumber = 1;
 
-	while (nslaves > 0 && reportNumber<10) {
+	int reportNumber = 1;
+	char delimiter = ',';	
+
+	while (nslaves > 0 && reportNumber<3) {
 		MPI_Recv(buf, 256, MPI_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status );
 		switch (status.MPI_TAG) {
 			case MSG_EXIT: nslaves--; break;
-			case MSG_PRINT_UNORDERED:
-				printf("Thread prints: %s", buf);
+			case MSG_INITIALIZE:
+				pthread_mutex_lock(&g_Mutex);
+				printf("MSG_INITIALIZE prints: %s", buf);
 				fflush(stdout);
-			break;
-			case MSG_PRINT_ORDERED:
-				firstmsg = status.MPI_SOURCE;
-				for (i=0; i<size-1; i++) {
-					if (i == firstmsg){
-						printf("Thread prints: %s", buf);
-						fflush(stdout);
-					}else {
-						MPI_Recv( buf2, 256, MPI_CHAR, i, MSG_PRINT_ORDERED, MPI_COMM_WORLD, &status );
-						printf("Thread prints: %s", buf2);
-						fflush(stdout);
-					}
-				}
-			break;
+				char* token2 = strtok(buf, &delimiter);
+				int node = atoi(token2);
+				for(i=1;i<5;i++){
+				topology[node][i]=atoi(token2);
+				token2 = strtok(NULL, &delimiter);
+    			}
+				pthread_mutex_unlock(&g_Mutex);
+				break;
 			case MSG_REPORT:
 				printf("Thread prints: %s", buf);
 				fflush(stdout);
 
 				int result[13];
-				char delimiter = ',';
 				char* token = strtok(buf, &delimiter);
 				for(i=0;i<13;i++){
-				
 				// printf("%s\n", token);
 				result[i]=atoi(token);
 				token = strtok(NULL, &delimiter);
@@ -239,16 +164,29 @@ int master_io(MPI_Comm world_comm, MPI_Comm comm)
 	int termination_message = 6; 
 	MPI_Request request;
 
-	int k;
+	
 	// MPI_Send(&termination_message, 1, MPI_INT, 1, MSG_EXIT, MPI_COMM_WORLD);
-
-	for(k=0;k<size-1;k++){
+	int k,j;
+	for(k=0;k<nslaves;k++){
 		printf("Stop signal send to rank: %d\n",k);
 		fflush(stdout);
 		MPI_Isend(&k, 1, MPI_INT, k, MSG_END, world_comm,&request);
 	}
 	printf("Boardcast finished\n");
 	fflush(stdout);
+
+	printf("topo:");
+	for(k=0;k<nslaves;k++){
+		printf("node %d:",k);
+		for(j=0;j<4;j++){
+			printf("%d ",topology[k][j]);
+			fflush(stdout);
+		}
+		printf("\n");
+	}
+	printf("topo finished\n");
+	fflush(stdout);
+	pthread_mutex_destroy(&g_Mutex);
     return 0;
 
 }
@@ -285,7 +223,7 @@ int slave_io(MPI_Comm world_comm, MPI_Comm comm)
 	//t1
 	MPI_Dims_create(size, ndims, dims);
 	// if(my_rank==0)
-	printf("Slave Rank: %d. Comm Size: %d: Grid Dimension = [%d x %d] \n",my_rank,size,dims[0],dims[1]);
+	// printf("Slave Rank: %d. Comm Size: %d: Grid Dimension = [%d x %d] \n",my_rank,size,dims[0],dims[1]);
 
 	//q2
 	wrap_around[0] = 0;
@@ -306,7 +244,9 @@ int slave_io(MPI_Comm world_comm, MPI_Comm comm)
 	//q2 send and receive value of each node
 	int action_list[4] = {nbr_j_lo, nbr_j_hi, nbr_i_lo, nbr_i_hi};
 	int recv_data[4] = {-1, -1, -1, -1};
+	char strings[4][50]; 
 	// neighbour's rank
+
 
 	// Receive stop signal from base
 	int termination_received = 0;
@@ -348,6 +288,22 @@ int slave_io(MPI_Comm world_comm, MPI_Comm comm)
 		MPI_Waitall(4, send_request, send_status);
 		MPI_Waitall(4, receive_request, receive_status);
 
+		
+
+		int initialize_received = 0;
+		MPI_Request initialize_request;
+		MPI_Status tinitialize_status;
+		int initialize_message = -1;
+		MPI_Irecv(&initialize_message, 1, MPI_INT, MPI_ANY_SOURCE, MSG_INITIALIZE, world_comm,&initialize_request);
+		// if(initialize_message==0){
+			
+			sprintf(buf, "%d,%d,%d,%d,%d,%d\n",my_cart_rank,recv_data[0], recv_data[1], recv_data[2], recv_data[3],dims[0]);
+			printf("node init: %s", buf);
+			fflush(stdout);
+			MPI_Isend(&buf, 50, MPI_CHAR, worldSize - 1, MSG_INITIALIZE, world_comm, &initialize_request);
+		
+
+
 		//print result
 		// if(my_rank == 1){
 			// Neighbour's rank : nbr_j_lo
@@ -386,6 +342,9 @@ int slave_io(MPI_Comm world_comm, MPI_Comm comm)
 				char timeString[100]; 
 				struct tm *localTime = localtime(&currentTime);
 				strftime(timeString, sizeof(timeString), "%Y-%m-%d %H:%M:%S", localTime);
+				if(my_cart_rank==0){
+					printf("%s",timeString);
+				}
 				// printf("Current local time: %s\n", timeString);
 				// // printf("report\n");
 				sprintf(buf, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%s\n",my_cart_rank,coord[0], coord[1], num, recv_data[0], recv_data[1], recv_data[2], recv_data[3],nbr_j_lo, nbr_j_hi, nbr_i_lo, nbr_i_hi,dims[0],timeString);
@@ -398,13 +357,6 @@ int slave_io(MPI_Comm world_comm, MPI_Comm comm)
 
 			}
 		}
-
-
-
-
-
-
-
 
 		sleep(1);
 		// Check stop signal
