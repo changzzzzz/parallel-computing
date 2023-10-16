@@ -11,7 +11,7 @@
 #define MSG_PRINT_ORDERED 2
 #define MSG_PRINT_UNORDERED 3
 #define MSG_END 4
-#define MSG_ASK 5
+#define MSG_REPORT 5
 #define MSG_ANSWER 6
 #define SHIFT_ROW 0
 #define SHIFT_COL 1
@@ -70,10 +70,6 @@ int main(int argc, char **argv)
     MPI_Finalize();
 
 
- 
-
-
-
     return 0;
 }
 
@@ -81,13 +77,15 @@ void* ProcessFunc(void *pArg) // Common function prototype
 {
 	int i = 0, size, nslaves, firstmsg;
 	char buf[256], buf2[256];
+	FILE *pFile;
 	MPI_Status status;
 	MPI_Comm_size(MPI_COMM_WORLD, &size );
 	
 	int* p = (int*)pArg;
 	nslaves = *p;
+	int reportNumber = 1;
 
-	while (nslaves > 0) {
+	while (nslaves > 0 && reportNumber<10) {
 		MPI_Recv(buf, 256, MPI_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status );
 		switch (status.MPI_TAG) {
 			case MSG_EXIT: nslaves--; break;
@@ -108,10 +106,48 @@ void* ProcessFunc(void *pArg) // Common function prototype
 					}
 				}
 			break;
+			case MSG_REPORT:
+				printf("Thread prints: %s", buf);
+				fflush(stdout);
+
+				int result[13];
+				char delimiter = ',';
+				char* token = strtok(buf, &delimiter);
+				for(i=0;i<13;i++){
+				
+				// printf("%s\n", token);
+				result[i]=atoi(token);
+				token = strtok(NULL, &delimiter);
+    			}
+				// printf("%s",token);
+				time_t currentTime;
+				time(&currentTime);
+				char timeString[100]; 
+				struct tm *localTime = localtime(&currentTime);
+				strftime(timeString, sizeof(timeString), "%Y-%m-%d %H:%M:%S", localTime);
+
+				int sender_rank = status.MPI_SOURCE;
+				sprintf(buf, "log_%d.txt", reportNumber);
+				pFile = fopen(buf, "w");
+				fprintf(pFile, "Max port number %d\n",K);
+				fprintf(pFile, "Report number %d\n",reportNumber);
+				fprintf(pFile, "Alert reported time : %s \n",token);
+				fprintf(pFile, "Logged time: %s \n",timeString);		 
+				fprintf(pFile, "Reporting node     Coordinate     Prot Value     Availability to be considered full\n");
+				fprintf(pFile, "%d                  (%d,%d)          %d              %d \n",result[0],result[1],result[2],result[3],K - result[3]);
+				fprintf(pFile, "Adjacent node     Coordinate     Prot Value     Availability to be considered full\n");
+				for(i=8;i<12;i++){
+					if(result[i]>=0){
+						fprintf(pFile, "%d                 (%d,%d)          %d              %d \n",result[i],result[i]/result[12],result[i]%result[12],result[i-4],K - result[i-4]);
+					}
+				}
+				fprintf(pFile, "End of file \n");
+				// printf("Rank: 0%d; Coord: (1%d, 2%d). Node's Load: 3%d; Value{ Recv Left: 4%d; Recv Right: 5%d; Recv Top: 6%d; Recv Bottom: 7%d;}Rank{ Left: 8%d. Right: 9%d. Top:10 %d. Bottom: 11%d}\n", my_cart_rank,coord[0], coord[1], num, recv_data[0], recv_data[1], recv_data[2], recv_data[3],nbr_j_lo, nbr_j_hi, nbr_i_lo, nbr_i_hi);
+				fclose(pFile);
+				reportNumber++;
+				break;
 		}
 	}
-	
-
 	return 0;
 }
 
@@ -126,10 +162,81 @@ int master_io(MPI_Comm world_comm, MPI_Comm comm)
 	// pthread_t tid;
 	// pthread_create(&tid, 0, ProcessFunc, &nslaves); // Create the thread
 	// pthread_join(tid, NULL);
+	int i = 0, firstmsg;
+	char buf[256], buf2[256];
+	FILE *pFile;
+	MPI_Status status;
+	// MPI_Comm_size(MPI_COMM_WORLD, &size );
+	
+	// int* p = (int*)pArg;
+	// nslaves = *p;
+	int reportNumber = 1;
+
+	while (nslaves > 0 && reportNumber<10) {
+		MPI_Recv(buf, 256, MPI_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status );
+		switch (status.MPI_TAG) {
+			case MSG_EXIT: nslaves--; break;
+			case MSG_PRINT_UNORDERED:
+				printf("Thread prints: %s", buf);
+				fflush(stdout);
+			break;
+			case MSG_PRINT_ORDERED:
+				firstmsg = status.MPI_SOURCE;
+				for (i=0; i<size-1; i++) {
+					if (i == firstmsg){
+						printf("Thread prints: %s", buf);
+						fflush(stdout);
+					}else {
+						MPI_Recv( buf2, 256, MPI_CHAR, i, MSG_PRINT_ORDERED, MPI_COMM_WORLD, &status );
+						printf("Thread prints: %s", buf2);
+						fflush(stdout);
+					}
+				}
+			break;
+			case MSG_REPORT:
+				printf("Thread prints: %s", buf);
+				fflush(stdout);
+
+				int result[13];
+				char delimiter = ',';
+				char* token = strtok(buf, &delimiter);
+				for(i=0;i<13;i++){
+				
+				// printf("%s\n", token);
+				result[i]=atoi(token);
+				token = strtok(NULL, &delimiter);
+    			}
+				// printf("%s",token);
+				time_t currentTime;
+				time(&currentTime);
+				char timeString[100]; 
+				struct tm *localTime = localtime(&currentTime);
+				strftime(timeString, sizeof(timeString), "%Y-%m-%d %H:%M:%S", localTime);
+
+				int sender_rank = status.MPI_SOURCE;
+				sprintf(buf, "log_%d.txt", reportNumber);
+				pFile = fopen(buf, "w");
+				fprintf(pFile, "Max port number %d\n",K);
+				fprintf(pFile, "Report number %d\n",reportNumber);
+				fprintf(pFile, "Alert reported time : %s \n",token);
+				fprintf(pFile, "Logged time: %s \n",timeString);		 
+				fprintf(pFile, "Reporting node     Coordinate     Prot Value     Availability to be considered full\n");
+				fprintf(pFile, "%d                  (%d,%d)          %d              %d \n",result[0],result[1],result[2],result[3],K - result[3]);
+				fprintf(pFile, "Adjacent node     Coordinate     Prot Value     Availability to be considered full\n");
+				for(i=8;i<12;i++){
+					if(result[i]>=0){
+						fprintf(pFile, "%d                 (%d,%d)          %d              %d \n",result[i],result[i]/result[12],result[i]%result[12],result[i-4],K - result[i-4]);
+					}
+				}
+				fprintf(pFile, "End of file \n");
+				// printf("Rank: 0%d; Coord: (1%d, 2%d). Node's Load: 3%d; Value{ Recv Left: 4%d; Recv Right: 5%d; Recv Top: 6%d; Recv Bottom: 7%d;}Rank{ Left: 8%d. Right: 9%d. Top:10 %d. Bottom: 11%d}\n", my_cart_rank,coord[0], coord[1], num, recv_data[0], recv_data[1], recv_data[2], recv_data[3],nbr_j_lo, nbr_j_hi, nbr_i_lo, nbr_i_hi);
+				fclose(pFile);
+				reportNumber++;
+				break;
+		}
+	}
 
 	int termination_message = 6; 
-	sleep(10);
-
 	MPI_Request request;
 
 	int k;
@@ -178,7 +285,7 @@ int slave_io(MPI_Comm world_comm, MPI_Comm comm)
 	//t1
 	MPI_Dims_create(size, ndims, dims);
 	// if(my_rank==0)
-	// printf("Slave Rank: %d. Comm Size: %d: Grid Dimension = [%d x %d] \n",my_rank,size,dims[0],dims[1]);
+	printf("Slave Rank: %d. Comm Size: %d: Grid Dimension = [%d x %d] \n",my_rank,size,dims[0],dims[1]);
 
 	//q2
 	wrap_around[0] = 0;
@@ -231,12 +338,12 @@ int slave_io(MPI_Comm world_comm, MPI_Comm comm)
 		// 	}
 		// 	MPI_Wait(&receive_from_neighbour_status, &neighbour_status);
 		// 	int sender_rank = status.MPI_SOURCE;
-			
+		
 		// }
 
 		for (int i = 0; i < 4; i++){
-			MPI_Isend(&num, 1, MPI_INT, action_list[i], MSG_ASK, comm2D, &send_request[i]);
-			MPI_Irecv(&recv_data[i], 1, MPI_INT, action_list[i], MSG_ASK, comm2D, &receive_request[i]);
+			MPI_Isend(&num, 1, MPI_INT, action_list[i], 0, comm2D, &send_request[i]);
+			MPI_Irecv(&recv_data[i], 1, MPI_INT, action_list[i], 0, comm2D, &receive_request[i]);
 		}
 		MPI_Waitall(4, send_request, send_status);
 		MPI_Waitall(4, receive_request, receive_status);
@@ -246,25 +353,49 @@ int slave_io(MPI_Comm world_comm, MPI_Comm comm)
 			// Neighbour's rank : nbr_j_lo
 			// printf("Cart rank: %d. Coord: (%d, %d). Rank{ Left: %d. Right: %d. Top: %d. Bottom: %d}\n",  my_cart_rank, coord[0], coord[1], nbr_j_lo, nbr_j_hi, nbr_i_lo, nbr_i_hi);
 			// Self value + Neighbour's value : 
-		printf("Rank: %d; Coord: (%d, %d). Random value: %d; Value{ Recv Left: %d; Recv Right: %d; Recv Top: %d; Recv Bottom: %d;}Rank{ Left: %d. Right: %d. Top: %d. Bottom: %d}\n", my_cart_rank,coord[0], coord[1], num, recv_data[0], recv_data[1], recv_data[2], recv_data[3],nbr_j_lo, nbr_j_hi, nbr_i_lo, nbr_i_hi);
+		// printf("Rank: %d; Coord: (%d, %d). Node's Load: %d; Value{ Recv Left: %d; Recv Right: %d; Recv Top: %d; Recv Bottom: %d;}Rank{ Left: %d. Right: %d. Top: %d. Bottom: %d}\n", my_cart_rank,coord[0], coord[1], num, recv_data[0], recv_data[1], recv_data[2], recv_data[3],nbr_j_lo, nbr_j_hi, nbr_i_lo, nbr_i_hi);
+				// printf("Rank: %d; Coord: (%d, %d).   %d; %d;  %d; %d;}\n", my_cart_rank,coord[0], coord[1], recv_data[0], recv_data[1], recv_data[2], recv_data[3]);
+
 			// Neighbour's value : recv_data[0-3]
 			// printf("Cart rank: %d. Coord: (%d, %d). Value{ Recv Left: %d; Recv Right: %d; Recv Top: %d; Recv Bottom: %d;} \n",  my_cart_rank, coord[0], coord[1],recv_data[0], recv_data[1], recv_data[2], recv_data[3]);
 		
-		// This node is full
 
-		if(num == K-1){
+		// This node is full
+		if(num >= K - 2){
 			int flag = 1;
 			int freeNeighbour[4] = {0, 0, 0, 0};
 
 			// if any neighbour has free port, flag = 0, and it will be recorded in freeNeighbour
-			for (int i = 0; i < size; ++i) {
-        		if (recv_data[i] > 0 || recv_data[i] < K) {
+			for (int i = 0; i < 4; i++) {
+				// printf("%d ",recv_data[i]);
+				// fflush(stdout);
+        		if (recv_data[i] > -1 && recv_data[i] < K- 2){
+				
 					flag = 0;
 					freeNeighbour[i] = 1;
-       			}
+					
+       			}else{
+
+				}
 			}
+			// printf("flag = %d \n",flag);
+			// fflush(stdout);
 			if(flag){
-				
+				time_t currentTime;
+				time(&currentTime);
+				char timeString[100]; 
+				struct tm *localTime = localtime(&currentTime);
+				strftime(timeString, sizeof(timeString), "%Y-%m-%d %H:%M:%S", localTime);
+				// printf("Current local time: %s\n", timeString);
+				// // printf("report\n");
+				sprintf(buf, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%s\n",my_cart_rank,coord[0], coord[1], num, recv_data[0], recv_data[1], recv_data[2], recv_data[3],nbr_j_lo, nbr_j_hi, nbr_i_lo, nbr_i_hi,dims[0],timeString);
+				// printf("Rank: %d; Coord: (%d, %d). Node's Load: %d; Value{ Recv Left: %d; Recv Right: %d; Recv Top: %d; Recv Bottom: %d;}Rank{ Left: %d. Right: %d. Top: %d. Bottom: %d}\n", my_cart_rank,coord[0], coord[1], num, recv_data[0], recv_data[1], recv_data[2], recv_data[3],nbr_j_lo, nbr_j_hi, nbr_i_lo, nbr_i_hi);
+
+				MPI_Send(buf, strlen(buf) + 1, MPI_CHAR, worldSize -1 , MSG_REPORT, world_comm);
+
+				// sprintf(buf, "Slave %d at Coordinate: (%d, %d) is exiting\n", my_rank, coord[0], coord[1]);
+				// MPI_Send(buf, strlen(buf) + 1, MPI_CHAR, worldSize-1, MSG_PRINT_ORDERED, world_comm);
+
 			}
 		}
 
@@ -275,7 +406,7 @@ int slave_io(MPI_Comm world_comm, MPI_Comm comm)
 
 
 
-		sleep(2);
+		sleep(1);
 		// Check stop signal
 		MPI_Test(&termination_request, &termination_received, &termination_status);
 	}

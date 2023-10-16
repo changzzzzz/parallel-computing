@@ -1,5 +1,0 @@
-Global rank: 0. Cart rank: 0. Coord: (0, 0). Left: -2. Right: 1. Top: -2. Bottom: 2
-
-[ITERATION 14] Random value: 22; Recv Left: -1; Recv Right: 40; Recv Top: -1; Recv Bottom: 22; Num of matches:1
-[ITERATION 27] Random value: 35; Recv Left: -1; Recv Right: 34; Recv Top: -1; Recv Bottom: 35; Num of matches:1
-[ITERATION 28] Random value: 46; Recv Left: -1; Recv Right: 8; Recv Top: -1; Recv Bottom: 46; Num of matches:1

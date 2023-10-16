@@ -1,9 +1,0 @@
-Global rank: 3. Cart rank: 3. Coord: (1, 1). Left: 2. Right: -2. Top: 1. Bottom: 5
-
-[ITERATION 10] Random value: 27; Recv Left: 21; Recv Right: -1; Recv Top: 27; Recv Bottom: 21; Num of matches:1
-[ITERATION 16] Random value: 32; Recv Left: 14; Recv Right: -1; Recv Top: 32; Recv Bottom: 4; Num of matches:1
-[ITERATION 29] Random value: 30; Recv Left: 49; Recv Right: -1; Recv Top: 30; Recv Bottom: 14; Num of matches:1
-[ITERATION 31] Random value: 38; Recv Left: 27; Recv Right: -1; Recv Top: 38; Recv Bottom: 49; Num of matches:1
-[ITERATION 37] Random value: 27; Recv Left: 30; Recv Right: -1; Recv Top: 27; Recv Bottom: 8; Num of matches:1
-[ITERATION 47] Random value: 4; Recv Left: 25; Recv Right: -1; Recv Top: 18; Recv Bottom: 4; Num of matches:1
-[ITERATION 49] Random value: 42; Recv Left: 42; Recv Right: -1; Recv Top: 24; Recv Bottom: 27; Num of matches:1
