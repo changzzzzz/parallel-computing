@@ -113,7 +113,7 @@ int master_io(MPI_Comm world_comm, MPI_Comm comm)
 	int reportNumber = 1;
 	char delimiter = ',';	
 	int tempNumber,nodeNumber;
-	while (nslaves > 0 && reportNumber<3) {
+	while (nslaves > 0 && reportNumber<10) {
 		MPI_Recv(buf, 256, MPI_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 		switch (status.MPI_TAG) {
 			case MSG_EXIT: nslaves--; break;
@@ -214,16 +214,18 @@ int master_io(MPI_Comm world_comm, MPI_Comm comm)
 				int flag=1;
 				for(i=0;i<nslaves;i++){
 					if(freeNode[i]==1){
-						printf("%d",i);
+						printf("%d ",i);
 						for(j=0;j<3;j++){
 							if(queue[j][i]==1){
 								flag = 0;
 							}
 						}
 						if(flag == 1){
+							printf("yes\n");
 							fprintf(pFile, "%d ",i);
 
 						}
+						flag=1;
 
 					}
 				}
