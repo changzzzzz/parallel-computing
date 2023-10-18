@@ -10,8 +10,8 @@
 #define MSG_PRINT_UNORDERED 2
 
 int master_io(MPI_Comm world_comm, MPI_Comm comm);
-int slave_io(MPI_Comm world_comm, MPI_Comm comm);
-void* ProcessFunc(void *pArg);
+int node_io(MPI_Comm world_comm, MPI_Comm comm);
+void* MsgSendReceive(void *pArg);
 
 pthread_mutex_t g_Mutex = PTHREAD_MUTEX_INITIALIZER;
 int g_nslaves = 0;
@@ -29,12 +29,12 @@ int main(int argc, char **argv)
     if (rank == size-1) 
 	master_io( MPI_COMM_WORLD, new_comm );
     else
-	slave_io( MPI_COMM_WORLD, new_comm );
+	node_io( MPI_COMM_WORLD, new_comm );
     MPI_Finalize();
     return 0;
 }
 
-void* ProcessFunc(void *pArg) // Common function prototype
+void* MsgSendReceive(void *pArg) // Common function prototype
 {
 	char buf[256];
 	MPI_Status status;
@@ -81,7 +81,7 @@ int master_io(MPI_Comm world_comm, MPI_Comm comm)
 	
 	pthread_t tid;
 	pthread_mutex_init(&g_Mutex, NULL);
-	pthread_create(&tid, 0, ProcessFunc, NULL); // Create the thread
+	pthread_create(&tid, 0, MsgSendReceive, NULL); // Create the thread
 
 	char buf[256];
 	MPI_Status status;
@@ -122,7 +122,7 @@ int master_io(MPI_Comm world_comm, MPI_Comm comm)
 }
 
 /* This is the slave */
-int slave_io(MPI_Comm world_comm, MPI_Comm comm)
+int node_io(MPI_Comm world_comm, MPI_Comm comm)
 {
 	int ndims=2, size, my_rank, reorder, my_cart_rank, ierr, masterSize;
 	MPI_Comm comm2D;

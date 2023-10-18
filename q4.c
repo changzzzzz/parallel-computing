@@ -9,7 +9,7 @@
 #define MSG_PRINT_UNORDERED 3
 
 int master_io(MPI_Comm master_comm, MPI_Comm comm);
-int slave_io(MPI_Comm master_comm, MPI_Comm comm);
+int node_io(MPI_Comm master_comm, MPI_Comm comm);
 
 int main(int argc, char **argv)
 {
@@ -21,7 +21,7 @@ int main(int argc, char **argv)
     if (rank == 0) 
 	master_io( MPI_COMM_WORLD, new_comm );
     else
-	slave_io( MPI_COMM_WORLD, new_comm );
+	node_io( MPI_COMM_WORLD, new_comm );
     MPI_Finalize();
     return 0;
 }
@@ -62,7 +62,7 @@ int master_io(MPI_Comm master_comm, MPI_Comm comm)
     return 0;
 }
 /* This is the slave */
-int slave_io(MPI_Comm master_comm, MPI_Comm comm)
+int node_io(MPI_Comm master_comm, MPI_Comm comm)
 {
 	char buf[256];
 	int  rank;

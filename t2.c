@@ -11,8 +11,8 @@
 #define MSG_PRINT_UNORDERED 3
 
 int master_io(MPI_Comm world_comm, MPI_Comm comm);
-int slave_io(MPI_Comm world_comm, MPI_Comm comm);
-void* ProcessFunc(void *pArg);
+int node_io(MPI_Comm world_comm, MPI_Comm comm);
+void* MsgSendReceive(void *pArg);
 
 int main(int argc, char **argv)
 {
@@ -27,12 +27,12 @@ int main(int argc, char **argv)
     if (rank == size-1) 
 	master_io( MPI_COMM_WORLD, new_comm );
     else
-	slave_io( MPI_COMM_WORLD, new_comm );
+	node_io( MPI_COMM_WORLD, new_comm );
     MPI_Finalize();
     return 0;
 }
 
-void* ProcessFunc(void *pArg) // Common function prototype
+void* MsgSendReceive(void *pArg) // Common function prototype
 {
 	int i = 0, size, nslaves, firstmsg;
 	char buf[256], buf2[256];
@@ -78,14 +78,14 @@ int master_io(MPI_Comm world_comm, MPI_Comm comm)
 	nslaves = size - 1;
 	
 	pthread_t tid;
-	pthread_create(&tid, 0, ProcessFunc, &nslaves); // Create the thread
+	pthread_create(&tid, 0, MsgSendReceive, &nslaves); // Create the thread
 	pthread_join(tid, NULL); // Wait for the thread to complete.
 
     return 0;
 }
 
 /* This is the slave */
-int slave_io(MPI_Comm world_comm, MPI_Comm comm)
+int node_io(MPI_Comm world_comm, MPI_Comm comm)
 {
 	int ndims=2, size, my_rank, reorder, my_cart_rank, ierr, masterSize;
 	MPI_Comm comm2D;
