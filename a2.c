@@ -69,10 +69,18 @@ int main(int argc, char **argv)
     return 0;
 }
 
+struct ThreadData {
+    MPI_Comm world_comm;
+    MPI_Comm new_comm;
+};
 
-/* This is the base */
-int master_io(MPI_Comm world_comm, MPI_Comm comm) 
+
+void* ProcessFunc(void *pArg) // Common function prototype
 {
+
+	struct ThreadData *data = (struct ThreadData *)pArg;
+	MPI_Comm world_comm = data->world_comm;
+
 	int size, nslaves,i,j,k,flag=1;
 	MPI_Comm_size(world_comm, &size);
 	nslaves = size - 1;
@@ -98,11 +106,7 @@ int master_io(MPI_Comm world_comm, MPI_Comm comm)
 	}
 	printf("Initialze topology finished\n");
 	fflush(stdout);
-	/**/
 
-	// pthread_t tid;
-	// pthread_create(&tid, 0, ProcessFunc, &nslaves); // Create the thread
-	// pthread_join(tid, NULL);
 	int  firstmsg;
 	i = 0;
 	char buf[256], buf2[256];
@@ -280,6 +284,231 @@ int master_io(MPI_Comm world_comm, MPI_Comm comm)
 		printf("\n");
 	}
 	printf("topo finished\n");
+	fflush(stdout);
+	pthread_mutex_destroy(&g_Mutex);
+    return 0;
+	
+
+	return 0;
+}
+
+
+/* This is the base */
+int master_io(MPI_Comm world_comm, MPI_Comm comm) 
+{
+	int size, nslaves,i,j,k,flag=1;
+	MPI_Comm_size(world_comm, &size);
+	nslaves = size - 1;
+	pthread_mutex_t g_Mutex = PTHREAD_MUTEX_INITIALIZER;
+	struct ThreadData data;
+	data.world_comm = world_comm;
+	data.new_comm = comm;
+
+	pthread_t tid;
+	pthread_create(&tid, 0, ProcessFunc, (void *)&data); // Create the thread
+	pthread_join(tid, NULL);
+
+	/*
+	//topology store the neighbour of each node
+	int topology[nslaves][4];
+	int queue[3][nslaves];
+	int queuePointer=0;
+
+	for(i=0;i<3;i++){
+		for(j=0;j<nslaves;j++){
+			queue[i][j]=-1;
+		}
+	}
+
+	MPI_Request init_request;
+	for(i=0;i<nslaves;i++){
+		printf("Ask slave for their neighbour: %d\n",i);
+		fflush(stdout);
+		MPI_Isend(&flag, 1, MPI_INT, i, MSG_INITIALIZE, world_comm,&init_request);
+	}
+	printf("Initialze topology finished\n");
+	fflush(stdout);
+	
+
+
+	int  firstmsg;
+	i = 0;
+	char buf[256], buf2[256];
+	FILE *pFile;
+	MPI_Status status;
+	// MPI_Comm_size(MPI_COMM_WORLD, &size );
+
+	int reportNumber = 1;
+	char delimiter = ',';	
+	int tempNumber,nodeNumber;
+	while (nslaves > 0 && reportNumber<10) {
+		MPI_Recv(buf, 256, MPI_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+		switch (status.MPI_TAG) {
+			case MSG_EXIT: nslaves--; break;
+			case MSG_INITIALIZE:
+				pthread_mutex_lock(&g_Mutex);
+				
+				// printf("MSG_INITIALIZE prints: %s", buf);
+				fflush(stdout);
+				char* token2 = strtok(buf, &delimiter);
+				nodeNumber = atoi(token2);
+				printf("node number: %d, ", nodeNumber);
+				fflush(stdout);
+				for (i=0;i<4;i++) {
+				
+				token2 = strtok(NULL, &delimiter);
+				printf("%s ", token2);
+				fflush(stdout);
+				topology[nodeNumber][i] = atoi(token2);
+				}
+				printf("\n");
+				fflush(stdout);
+
+				pthread_mutex_unlock(&g_Mutex);
+				break;
+			case MSG_REPORT:
+				printf("master MSG_REPORT prints: %s", buf);
+				fflush(stdout);
+
+				int result[13];
+				char* token = strtok(buf, &delimiter);
+				for(i=0;i<13;i++){
+				// printf("%s\n", token);
+				result[i]=atoi(token);
+				token = strtok(NULL, &delimiter);
+    			}
+				// printf("%s",token);
+				time_t currentTime;
+				time(&currentTime);
+				char timeString[100]; 
+				struct tm *localTime = localtime(&currentTime);
+				strftime(timeString, sizeof(timeString), "%Y-%m-%d %H:%M:%S", localTime);
+
+				int sender_rank = status.MPI_SOURCE;
+				sprintf(buf, "log_%d.txt", reportNumber);
+				pFile = fopen(buf, "w");
+				fprintf(pFile, "Max port number %d\n",K);
+				fprintf(pFile, "Report number %d\n",reportNumber);
+				fprintf(pFile, "Alert reported time : %s \n",token);
+				fprintf(pFile, "Logged time: %s \n",timeString);		 
+				fprintf(pFile, "Reporting node     Coordinate     Prot Value     Availability to be considered full\n");
+				fprintf(pFile, "%d                  (%d,%d)          %d              %d \n",result[0],result[1],result[2],result[3],K - result[3]);
+				fprintf(pFile, "Adjacent node      Coordinate     Prot Value     Availability to be considered full\n");
+				for(i=8;i<12;i++){
+					if(result[i]>=0){
+						fprintf(pFile, "%d                  (%d,%d)          %d              %d \n",result[i],result[i]/result[12],result[i]%result[12],result[i-4],K - result[i-4]);
+						
+					}
+				}
+
+				int freeNode[nslaves];
+				for(i=0;i<nslaves;i++){
+					freeNode[i] = -1;
+				}
+			
+				printf("Reporting node :%d \n",result[0]);
+				queue[queuePointer][result[0]]=1;
+
+				for(i=0;i<4;i++){
+					if(result[8+i]>=0){
+						printf("Reporting node's neighbour: %d's neighbour :",result[8+i]);
+						queue[queuePointer][result[8+i]]=1;
+						for(j=0;j<4;j++){
+							if(topology[result[8+i]][j]>=0){
+								printf("%d ",topology[result[8+i]][j]);
+								freeNode[topology[result[8+i]][j]]=1;
+							}
+						}
+						printf("\n");
+					}
+				}
+				fprintf(pFile, "Nearby Nodes      Coordinate\n");
+				for(i=0;i<nslaves;i++){
+					// printf("%d ",freeNode[k]);
+					if(freeNode[i]==1 && i != result[0]){
+						printf("All neighbour's neighbours %d\n",i);
+						fprintf(pFile, "%d                 (%d,%d)\n",i,i/result[12],i%result[12]);
+					}
+				}
+				for(i=0;i<nslaves;i++){
+					// printf("%d ",freeNode[k]);
+					if(queue[queuePointer][i]==1){
+						printf("Full node's records %d\n",i);
+					}
+				}
+
+				fprintf(pFile, "Available station nearby (no report received in last 3 iteration): ");
+
+				int flag=1;
+				for(i=0;i<nslaves;i++){
+					if(freeNode[i]==1){
+						printf("%d ",i);
+						for(j=0;j<3;j++){
+							if(queue[j][i]==1){
+								flag = 0;
+							}
+						}
+						if(flag == 1){
+							printf("yes\n");
+							fprintf(pFile, "%d ",i);
+
+						}
+						flag=1;
+
+					}
+				}
+				fprintf(pFile, "\n");
+
+
+
+
+
+
+				
+				
+
+				fprintf(pFile, "End of file \n");
+				// printf("Rank: 0%d; Coord: (1%d, 2%d). Node's Load: 3%d; Value{ Recv Left: 4%d; Recv Right: 5%d; Recv Top: 6%d; Recv Bottom: 7%d;}Rank{ Left: 8%d. Right: 9%d. Top:10 %d. Bottom: 11%d}\n", my_cart_rank,coord[0], coord[1], num, recv_data[0], recv_data[1], recv_data[2], recv_data[3],nbr_j_lo, nbr_j_hi, nbr_i_lo, nbr_i_hi);
+				fclose(pFile);
+				reportNumber++;
+				queuePointer = (queuePointer + 1) % 3;
+
+
+
+				//work here
+				// return node a free node number nearby
+
+
+
+				break;
+		}
+	}
+
+	int termination_message = 6; 
+	MPI_Request request;
+
+	
+	// MPI_Send(&termination_message, 1, MPI_INT, 1, MSG_EXIT, MPI_COMM_WORLD);
+	
+	for(k=0;k<nslaves;k++){
+		printf("Stop signal send to rank: %d\n",k);
+		fflush(stdout);
+		MPI_Isend(&k, 1, MPI_INT, k, MSG_END, world_comm,&request);
+	}
+	printf("Boardcast finished\n");
+	fflush(stdout);
+
+	printf("topo:\n");
+	for(k=0;k<nslaves;k++){
+		printf("node %d:",k);
+		for(j=0;j<4;j++){
+			printf("%d ",topology[k][j]);
+			fflush(stdout);
+		}
+		printf("\n");
+	}
+	*/
+	printf("master finished\n");
 	fflush(stdout);
 	pthread_mutex_destroy(&g_Mutex);
     return 0;
