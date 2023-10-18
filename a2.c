@@ -1,4 +1,3 @@
-
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -18,7 +17,7 @@
 #define DISP 1
 #define K 10
 
-int master_io(MPI_Comm world_comm, MPI_Comm comm);
+int master_io(MPI_Comm world_comm);
 int slave_io(MPI_Comm world_comm, MPI_Comm comm);
 void* ProcessFunc(void *pArg);
 void* SimulatePortNumber(void *pArg);
@@ -62,7 +61,7 @@ int main(int argc, char **argv)
     MPI_Comm new_comm;
     MPI_Comm_split( MPI_COMM_WORLD, rank == size - 1 , 0, &new_comm);
     if (rank == size -1 ) 
-	master_io( MPI_COMM_WORLD, new_comm);
+	master_io( MPI_COMM_WORLD);
     else
 	slave_io( MPI_COMM_WORLD, new_comm);
     MPI_Finalize();
@@ -71,7 +70,6 @@ int main(int argc, char **argv)
 
 struct ThreadData {
     MPI_Comm world_comm;
-    MPI_Comm new_comm;
 };
 
 
@@ -81,7 +79,10 @@ void* ProcessFunc(void *pArg) // Common function prototype
 	struct ThreadData *data = (struct ThreadData *)pArg;
 	MPI_Comm world_comm = data->world_comm;
 
-	int size, nslaves,i,j,k,flag=1;
+	int size, nslaves,i=0,j,k,flag=1,firstmsg;
+	char buf[256], buf2[256];
+	FILE *pFile;
+	MPI_Status status;
 	MPI_Comm_size(world_comm, &size);
 	nslaves = size - 1;
 	pthread_mutex_t g_Mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -100,19 +101,13 @@ void* ProcessFunc(void *pArg) // Common function prototype
 
 	MPI_Request init_request;
 	for(i=0;i<nslaves;i++){
-		printf("Ask slave for their neighbour: %d\n",i);
+		printf("Ask each node for their neighbour: %d\n",i);
 		fflush(stdout);
 		MPI_Isend(&flag, 1, MPI_INT, i, MSG_INITIALIZE, world_comm,&init_request);
 	}
-	printf("Initialze topology finished\n");
-	fflush(stdout);
 
-	int  firstmsg;
-	i = 0;
-	char buf[256], buf2[256];
-	FILE *pFile;
-	MPI_Status status;
-	// MPI_Comm_size(MPI_COMM_WORLD, &size );
+
+
 
 	int reportNumber = 1;
 	char delimiter = ',';	
@@ -121,39 +116,40 @@ void* ProcessFunc(void *pArg) // Common function prototype
 		MPI_Recv(buf, 256, MPI_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 		switch (status.MPI_TAG) {
 			case MSG_EXIT: nslaves--; break;
+
 			case MSG_INITIALIZE:
+				// Recevie each node's neighbour information 
 				pthread_mutex_lock(&g_Mutex);
-				
-				// printf("MSG_INITIALIZE prints: %s", buf);
-				fflush(stdout);
+
+				// data received can be split by ','
 				char* token2 = strtok(buf, &delimiter);
 				nodeNumber = atoi(token2);
-				printf("node number: %d, ", nodeNumber);
+				printf("node number: %d, neighbours: ", nodeNumber);
 				fflush(stdout);
 				for (i=0;i<4;i++) {
-				
-				token2 = strtok(NULL, &delimiter);
-				printf("%s ", token2);
-				fflush(stdout);
-				topology[nodeNumber][i] = atoi(token2);
+					token2 = strtok(NULL, &delimiter);
+					printf("%s ", token2);
+					fflush(stdout);
+					//store the neighbours to array called topology
+					topology[nodeNumber][i] = atoi(token2);
 				}
 				printf("\n");
 				fflush(stdout);
-
 				pthread_mutex_unlock(&g_Mutex);
 				break;
+
 			case MSG_REPORT:
-				printf("master MSG_REPORT prints: %s", buf);
+				// Receive the report data when reporting node and neighbour are full
+				printf("master receive MSG_REPORT: %s", buf);
 				fflush(stdout);
 
+				// data received can be split by ','
 				int result[13];
 				char* token = strtok(buf, &delimiter);
 				for(i=0;i<13;i++){
-				// printf("%s\n", token);
 				result[i]=atoi(token);
 				token = strtok(NULL, &delimiter);
     			}
-				// printf("%s",token);
 				time_t currentTime;
 				time(&currentTime);
 				char timeString[100]; 
@@ -161,6 +157,8 @@ void* ProcessFunc(void *pArg) // Common function prototype
 				strftime(timeString, sizeof(timeString), "%Y-%m-%d %H:%M:%S", localTime);
 
 				int sender_rank = status.MPI_SOURCE;
+
+				// Create report file
 				sprintf(buf, "log_%d.txt", reportNumber);
 				pFile = fopen(buf, "w");
 				fprintf(pFile, "Max port number %d\n",K);
@@ -181,7 +179,6 @@ void* ProcessFunc(void *pArg) // Common function prototype
 				for(i=0;i<nslaves;i++){
 					freeNode[i] = -1;
 				}
-			
 				printf("Reporting node :%d \n",result[0]);
 				queue[queuePointer][result[0]]=1;
 
@@ -294,7 +291,7 @@ void* ProcessFunc(void *pArg) // Common function prototype
 
 
 /* This is the base */
-int master_io(MPI_Comm world_comm, MPI_Comm comm) 
+int master_io(MPI_Comm world_comm) 
 {
 	int size, nslaves,i,j,k,flag=1;
 	MPI_Comm_size(world_comm, &size);
@@ -302,7 +299,6 @@ int master_io(MPI_Comm world_comm, MPI_Comm comm)
 	pthread_mutex_t g_Mutex = PTHREAD_MUTEX_INITIALIZER;
 	struct ThreadData data;
 	data.world_comm = world_comm;
-	data.new_comm = comm;
 
 	pthread_t tid;
 	pthread_create(&tid, 0, ProcessFunc, (void *)&data); // Create the thread
