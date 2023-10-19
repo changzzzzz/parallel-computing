@@ -1,6 +1,9 @@
 {
     "files.associations": {
         "pthread.h": "c",
-        "type_traits": "c"
+        "type_traits": "c",
+        "w11mergempi": "c",
+        "w11binsearch": "c",
+        "w11matrixmul2": "c"
     }
 }

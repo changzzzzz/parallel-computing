@@ -4,108 +4,104 @@
 #include <mpi.h>
 int BinSearchV2(int key, int *pId, int start, int end);
 int main(int argc, char *argv[]){
-int myRank, totalProcs, totalIds = 0, tag = 0;
-int numPerProcs, numPerProcsRemain;
-int localResult = -1, actualResult = 0;
-FILE *pFile;
-int *pId = NULL;
-float *pPrice = NULL;
-int query = 0;
-int i = 0, j = 0, offset = 0;
-char fileName[256] = {0};
-MPI_Init(&argc, &argv);
-MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
-MPI_Comm_size(MPI_COMM_WORLD, &totalProcs);
-MPI_Status stat;
-if(myRank == 0){
-pFile = fopen("data.txt","r");
-fscanf(pFile, "%d", &totalIds);
-pId = (int*)malloc(totalIds * sizeof(int));
-pPrice = (float*) malloc(totalIds * sizeof(float));
-for(i = 0; i < totalIds; i++){
-fscanf(pFile,"%d%f",&pId[i],&pPrice[i]);
-}
-fclose(pFile);
-}
-MPI_Bcast(&totalIds, 1, MPI_INT, 0, MPI_COMM_WORLD);
-// Workload distribution
-numPerProcs = totalIds / totalProcs;
-numPerProcsRemain = totalIds % totalProcs;
-if(myRank != 0 && myRank != totalProcs-1){
-pId = (int*)malloc(numPerProcs * sizeof(int));
-}
-if(myRank == totalProcs-1){
-pId = (int*)malloc((numPerProcs + numPerProcsRemain) *
-sizeof(int));
-}
-switch(myRank){
-case 0:{
-offset += numPerProcs;
-for(i = 1; i < totalProcs; i++){
-if(i != totalProcs-1){
-MPI_Send(pId + offset, numPerProcs, MPI_INT, i, 0,
-MPI_COMM_WORLD);
-offset += numPerProcs;
-}else{
-MPI_Send(pId + offset, numPerProcs +
-numPerProcsRemain, MPI_INT, i, 0, MPI_COMM_WORLD);
-offset += numPerProcs + numPerProcsRemain;
-}
-}
-printf("Product ID to search >> ");
-fflush(stdout);
-scanf("%d", &query);
-break;
-}
-default:{
-if(myRank != totalProcs-1){
-MPI_Recv(pId, numPerProcs, MPI_INT, 0, 0,
-MPI_COMM_WORLD, &stat);
-}else{
-MPI_Recv(pId, numPerProcs + numPerProcsRemain, MPI_INT,
-0, 0, MPI_COMM_WORLD, &stat);
-}
-break;
-}
-}
-MPI_Bcast(&query, 1, MPI_INT, 0, MPI_COMM_WORLD);
-// Call the binary search function.
-if(myRank != totalProcs-1){
-localResult = BinSearchV2(query, pId, 0, numPerProcs-1);
-}else{
-localResult = BinSearchV2(query, pId, 0,numPerProcs+numPerProcsRemain-1);
-}
-if(localResult > -1){
-localResult = localResult + (myRank * numPerProcs);
-}
-MPI_Reduce(&localResult, &actualResult, 1, MPI_INT, MPI_SUM, 0,
-MPI_COMM_WORLD);
-if(myRank == 0){
-if(actualResult > totalProcs * -1){
-actualResult = actualResult + (totalProcs - 1);
-printf("Price of product ID: %d is RM %.2f\n",
-pId[actualResult], pPrice[actualResult]);
-fflush(stdout);
-}else{
-puts("No such product.\n");
-fflush(stdout);
-}
-free(pId);
-free(pPrice);
-}else{
-free(pId);
-}
-MPI_Finalize();
-return 0;
+    int myRank, totalProcs, totalIds = 0, tag = 0;
+    int numPerProcs, numPerProcsRemain;
+    int localResult = -1, actualResult = 0;
+    FILE *pFile;
+    int *pId = NULL;
+    float *pPrice = NULL;
+    int query = 0;
+    int i = 0, j = 0, offset = 0;
+    char fileName[256] = {0};
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
+    MPI_Comm_size(MPI_COMM_WORLD, &totalProcs);
+    MPI_Status stat;
+    if(myRank == 0){
+        pFile = fopen("data.txt","r");
+        fscanf(pFile, "%d", &totalIds);
+        pId = (int*)malloc(totalIds * sizeof(int));
+        pPrice = (float*) malloc(totalIds * sizeof(float));
+        for(i = 0; i < totalIds; i++){
+            fscanf(pFile,"%d%f",&pId[i],&pPrice[i]);
+        }
+        fclose(pFile);
+    }
+    MPI_Bcast(&totalIds, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    // Workload distribution
+    numPerProcs = totalIds / totalProcs;
+    numPerProcsRemain = totalIds % totalProcs;
+    if(myRank != 0 && myRank != totalProcs-1){
+        pId = (int*)malloc(numPerProcs * sizeof(int));
+    }
+    if(myRank == totalProcs-1){
+        pId = (int*)malloc((numPerProcs + numPerProcsRemain) *sizeof(int));
+    }
+    switch(myRank){
+    case 0:{
+        offset += numPerProcs;
+        for(i = 1; i < totalProcs; i++){
+            if(i != totalProcs-1){
+                MPI_Send(pId + offset, numPerProcs, MPI_INT, i, 0,
+                MPI_COMM_WORLD);
+                offset += numPerProcs;
+            }else{
+                MPI_Send(pId + offset, numPerProcs +
+                numPerProcsRemain, MPI_INT, i, 0, MPI_COMM_WORLD);
+                offset += numPerProcs + numPerProcsRemain;
+            }
+        }
+        printf("Product ID to search >> ");
+        fflush(stdout);
+        scanf("%d", &query);
+        break;
+    }
+    default:{
+        if(myRank != totalProcs-1){
+            MPI_Recv(pId, numPerProcs, MPI_INT, 0, 0,MPI_COMM_WORLD, &stat);
+        }else{
+            MPI_Recv(pId, numPerProcs + numPerProcsRemain, MPI_INT,0, 0, MPI_COMM_WORLD, &stat);
+        }
+        break;
+    }
+    }
+    MPI_Bcast(&query, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    // Call the binary search function.
+    if(myRank != totalProcs-1){
+        localResult = BinSearchV2(query, pId, 0, numPerProcs-1);
+    }else{
+        localResult = BinSearchV2(query, pId, 0,numPerProcs+numPerProcsRemain-1);
+    }
+    if(localResult > -1){
+        localResult = localResult + (myRank * numPerProcs);
+    }
+    MPI_Reduce(&localResult, &actualResult, 1, MPI_INT, MPI_SUM, 0,MPI_COMM_WORLD);
+    if(myRank == 0){
+        if(actualResult > totalProcs * -1){
+            actualResult = actualResult + (totalProcs - 1);
+            printf("Price of product ID: %d is RM %.2f\n",
+            pId[actualResult], pPrice[actualResult]);
+            fflush(stdout);
+        }else{
+            puts("No such product.\n");
+            fflush(stdout);
+        }
+        free(pId);
+        free(pPrice);
+    }else{
+        free(pId);
+    }
+    MPI_Finalize();
+    return 0;
 }
 // Binary search algorithm
 int BinSearchV2(int key, int *pId, int start, int end){
-int mid = (start + end) / 2;
-int result = key - pId[mid];
-if(result == 0) return(mid);
-if(start >= end) return(-1);
-if(result<0)
-return(BinSearchV2(key,pId,start,mid-1));
-else
-return(BinSearchV2(key,pId,mid+1,end));
+    int mid = (start + end) / 2;
+    int result = key - pId[mid];
+    if(result == 0) return(mid);
+    if(start >= end) return(-1);
+    if(result<0)
+        return(BinSearchV2(key,pId,start,mid-1));
+    else
+        return(BinSearchV2(key,pId,mid+1,end));
 }

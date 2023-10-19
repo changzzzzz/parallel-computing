@@ -6,29 +6,28 @@
 #define MATRIX_CELL_MAXVAL 1000
 int main()
 {
-int row, col;
-int i,j;
-char matrixName[256] = {0};
-float randNum = 0;
-int maxVal = 100;
-printf("Welcome to the random matrix file generator!\n\n");
-printf("Specify the matrix file name (e.g. MatA.txt): ");
-scanf("%s", matrixName);
-printf("Specify the matrix row and col values (e.g. 10 10): ");
-scanf("%d%d", &row, &col);
-srand((unsigned int)time(NULL));
-FILE *pFile = fopen(matrixName, "w");
-fprintf(pFile, "%d\t%d\n", row, col);
-for(i = 0; i < row; i++){
-for(j = 0; j < col; j++){
-randNum = (float)rand()/(float)(RAND_MAX/maxVal);
-//randNum = 100 + ((unsigned int)rand() %
-MATRIX_CELL_MAXVAL);
-fprintf(pFile, "%.2f\t", randNum);
-}
-fprintf(pFile, "\n");
-}
-printf("Done!\n");
-fclose(pFile);
-return 0;
+    int row, col;
+    int i,j;
+    char matrixName[256] = {0};
+    float randNum = 0;
+    int maxVal = 100;
+    printf("Welcome to the random matrix file generator!\n\n");
+    printf("Specify the matrix file name (e.g. MatA.txt): ");
+    scanf("%s", matrixName);
+    printf("Specify the matrix row and col values (e.g. 10 10): ");
+    scanf("%d%d", &row, &col);
+    srand((unsigned int)time(NULL));
+    FILE *pFile = fopen(matrixName, "w");
+    fprintf(pFile, "%d\t%d\n", row, col);
+    for(i = 0; i < row; i++){
+        for(j = 0; j < col; j++){
+            randNum = (float)rand()/(float)(RAND_MAX/maxVal);
+            //randNum = 100 + ((unsigned int)rand() % MATRIX_CELL_MAXVAL);
+            fprintf(pFile, "%.2f\t", randNum);
+        }
+        fprintf(pFile, "\n");
+    }
+    printf("Done!\n");
+    fclose(pFile);
+    return 0;
 }
